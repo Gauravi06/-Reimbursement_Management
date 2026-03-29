@@ -191,8 +191,5 @@ npm run db:seed      # Seed demo data
 npm run db:studio    # Open Prisma Studio
 ```
 
----
 
-## 📄 License
 
-MIT
