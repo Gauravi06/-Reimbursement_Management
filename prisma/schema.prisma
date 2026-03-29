@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  FINANCE
+  DIRECTOR
+  ADMIN
+  CFO
+}
+
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalType {
+  SEQUENTIAL
+  OVERRIDE
+}
+
+model Organization {
+  id         String   @id @default(cuid())
+  clerkOrgId String   @unique
+  name       String
+  createdAt  DateTime @default(now())
+
+  users         User[]
+  expenses      Expense[]
+  approvalRules ApprovalRule[]
+}
+
+model User {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  email       String   @unique
+  firstName   String
+  lastName    String
+  role        Role     @default(EMPLOYEE)
+  createdAt   DateTime @default(now())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  submittedExpenses Expense[]        @relation("SubmittedBy")
+  approvalRecords   ApprovalRecord[]
+}
+
+model Expense {
+  id          String        @id @default(cuid())
+  merchant    String
+  date        DateTime
+  totalAmount Decimal       @db.Decimal(10, 2)
+  currency    String        @default("USD")
+  category    String
+  description String?
+  notes       String?
+  status      ExpenseStatus @default(PENDING)
+  currentStep Int           @default(0)
+  receiptUrl  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  submittedById String
+  submittedBy   User         @relation("SubmittedBy", fields: [submittedById], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  lineItems       ExpenseLineItem[]
+  approvalRecords ApprovalRecord[]
+}
+
+model ExpenseLineItem {
+  id          String  @id @default(cuid())
+  description String
+  amount      Decimal @db.Decimal(10, 2)
+  order       Int     @default(0)
+
+  expenseId String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRule {
+  id               String       @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id])
+  thresholdPercent Int          @default(60)
+  overrideRole     Role         @default(CFO)
+
+  steps ApprovalStep[]
+}
+
+model ApprovalStep {
+  id             String       @id @default(cuid())
+  order          Int
+  role           Role
+  type           ApprovalType @default(SEQUENTIAL)
+  slaDays        Int          @default(2)
+  approvalRuleId String
+  approvalRule   ApprovalRule @relation(fields: [approvalRuleId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRecord {
+  id        String   @id @default(cuid())
+  stepOrder Int
+  action    String   // "approved" | "rejected"
+  note      String?
+  createdAt DateTime @default(now())
+
+  expenseId  String
+  expense    Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  approverId String
+  approver   User    @relation(fields: [approverId], references: [id])
+}
